@@ -10,37 +10,38 @@ const clerkWebhooks = async (req, res) => {
             "svix-signature": req.headers["svix-signature"],
         };
         // verifying headers
-        await whook.verify(JSON.stringify(req.body),headers)
+        await whook.verify(JSON.stringify(req.body), headers)
         // getting data from request body
-        const {data, type} = req.body
+        const { data, type } = req.body
         const userData = {
             _id: data.id,
-            email:data.email.address[0].email_adress,
-            username:data.first_name + " "+ data.last_name,
+            email: data.email.address[0].email_adress,
+            username: data.first_name + " " + data.last_name,
             image: data.image_url,
 
         }
         switch (type) {
-            case "user.create":{
+            case "user.created": {
                 await User.create(userData)
                 break;
             }
-            case "user.update":{
+            case "user.updated": {
                 await User.findByIdAndUpdate(data.id, userData)
                 break;
             }
-            case "user.delete":{
+            case "user.deleted": {
                 await User.findByIdAndDelete(data.id)
                 break;
             }
             default:
                 break;
         }
-        req.JSON({success: true, message: "Webhook Recieved"})
+        res.json({ success: true, message: "Webhook Received" })
+
     } catch (error) {
         console.log(error.message);
-        req.JSON({success: false, message:error.message})
-        
+        req.JSON({ success: false, message: error.message })
+
     }
 }
 export default clerkWebhooks;
