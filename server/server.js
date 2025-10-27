@@ -18,7 +18,7 @@ app.use(clerkMiddleware())
 app.use("/api/clerk", clerkWebhooks);
 
 
-app.get("/", (req, res) => res.send("hello"));
+app.get("/", (req, res) => res.send("xin chào "));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
