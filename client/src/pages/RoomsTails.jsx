@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { assets, facilityIcons, roomCommonData, roomsDummyData } from '../assets/assets'
+import { useAppContext } from '../conext/AppContext'
+import toast from 'react-hot-toast'
 
 const StaticRating = () => (
     <div className="flex">
@@ -19,20 +21,91 @@ const StaticRating = () => (
             ))}
     </div>
 )
-
 const RoomsTails = () => {
-    const { id } = useParams()
-    const [room, setRoom] = useState(null)
-    const [mainImage, setMainImage] = useState(null)
+    const { id } = useParams();
+    const { rooms, getToken, axios, navigate } = useAppContext();
+    const [room, setRoom] = useState(null);
+    const [mainImage, setMainImage] = useState(null);
+    const [checkInDate, setCheckInDate] = useState(null);
+    const [checkOutDate, setCheckOutDate] = useState(null);
+    const [guests, setGuests] = useState(1);
+    const [isAvailable, setIsAvailable] = useState(false);
+    // ✅ 1. Hàm kiểm tra phòng
+    const CheckAvailability = async () => {
+        try {
+            if (!checkInDate || !checkOutDate) {
+                toast.error('Vui lòng chọn ngày nhận và trả phòng');
+                return;
+            }
+            if (checkInDate >= checkOutDate) {
+                toast.error('Ngày nhận phòng phải nhỏ hơn Ngày trả phòng');
+                return;
+            }
 
-    useEffect(() => {
-        const foundRoom = roomsDummyData.find(r => r._id === id)
-        if (foundRoom) {
-            setRoom(foundRoom)
-            setMainImage(foundRoom.images[0])
+            const { data } = await axios.post('/api/bookings/check-availability', {
+                room: id,
+                checkInDate,
+                checkOutDate,
+            });
+
+            if (data.success) {
+                if (data.isAvailable) {
+                    setIsAvailable(true);
+                    toast.success('Phòng còn trống, bạn có thể đặt ngay');
+                } else {
+                    setIsAvailable(false);
+                    toast.error('Phòng không có sẵn');
+                }
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            toast.error(error.message);
         }
-    }, [id])
+    };
 
+    // ✅ 2. Hàm đặt phòng thực sự
+    const handleBooking = async () => {
+        try {
+            const { data } = await axios.post(
+                '/api/bookings/book',
+                { room: id, checkInDate, checkOutDate, guests, paymentMethod: 'Pay At Hotel' },
+                { headers: { Authorization: `Bearer ${await getToken()}` } }
+            );
+
+            if (data.success) {
+                toast.success(data.message || 'Đặt phòng thành công');
+                navigate('/my-bookings');
+                scrollTo(0, 0);
+            } else {
+                toast.error(data.message || 'Đặt phòng thất bại');
+            }
+        } catch (error) {
+            toast.error(error.message || 'Có lỗi xảy ra khi đặt phòng');
+        }
+    };
+
+    // ✅ 3. Xử lý khi nhấn nút (check hoặc book)
+    const onSubmitHandle = async (e) => {
+        e.preventDefault();
+
+        if (!isAvailable) {
+            // Nếu chưa kiểm tra hoặc phòng chưa trống → kiểm tra trước
+            await CheckAvailability();
+        } else {
+            // Nếu phòng trống rồi → tiến hành book
+            await handleBooking();
+        }
+    };
+
+    // Load room
+    useEffect(() => {
+        const r = rooms.find(r => r._id === id);
+        if (r) {
+            setRoom(r);
+            setMainImage(r.images[0]);
+        }
+    }, [rooms, id]);
     return (
         room && (
             <div className="py-28 md:py-35 px-4 md:px-16 lg:px-24 xl:px-32">
@@ -63,31 +136,35 @@ const RoomsTails = () => {
                 </div>
 
                 {/* Images */}
-                <div className="flex flex-col lg:flex-row mt-6 gap-6">
-                    {/* Ảnh chính */}
-                    <div className="lg:w-1/2 w-full">
+                {/* Image Gallery */}
+                <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Ảnh chính bên trái */}
+                    <div className="w-full h-[500px]">
                         <img
                             src={mainImage}
-                            alt="Room Image"
-                            className="w-full rounded-xl shadow-lg object-cover"
+                            alt="Main Room"
+                            className="w-full h-full rounded-xl object-cover shadow-md"
                         />
                     </div>
 
-                    {/* Ảnh phụ */}
-                    <div className="grid grid-cols-2 gap-4 lg:w-1/2 w-full">
-                        {room?.images?.length > 1 &&
-                            room.images.map((image, index) => (
-                                <img
-                                    key={index}
-                                    onClick={() => setMainImage(image)}
-                                    src={image}
-                                    alt="Room Image"
-                                    className={`w-full rounded-xl shadow-md object-cover cursor-pointer ${mainImage === image ? 'outline outline-[3px] outline-orange-500' : ''
-                                        }`}
-                                />
-                            ))}
+                    {/* Lưới ảnh phụ bên phải */}
+                    <div className="grid grid-cols-2 grid-rows-2 gap-4 h-[500px]">
+                        {room.images.slice(0, 4).map((image, index) => (
+                            <img
+                                key={index}
+                                src={image}
+                                onClick={() => setMainImage(image)}
+                                alt={`Room ${index}`}
+                                className={`w-full h-full object-cover rounded-xl cursor-pointer transition-all duration-200 hover:scale-[1.02] ${mainImage === image
+                                    ? 'outline outline-[3px] outline-orange-500'
+                                    : ''
+                                    }`}
+                            />
+                        ))}
                     </div>
                 </div>
+
+
 
                 {/* Room Description + Amenities */}
                 <div className="flex flex-col md:flex-row md:justify-between mt-10">
@@ -120,6 +197,7 @@ const RoomsTails = () => {
                 </p>
                 {/* form */}
                 <form
+                    onSubmit={onSubmitHandle}
                     className="flex flex-col md:flex-row items-start md:items-center justify-between 
                bg-white shadow-[0px_0px_20px_rgba(0,0,0,0.15)] p-6 rounded-xl 
                mx-auto mt-16 max-w-6xl"
@@ -131,6 +209,8 @@ const RoomsTails = () => {
                                 Check-In
                             </label>
                             <input
+                                onChange={(e) => setCheckInDate(e.target.value)}
+                                min={new Date().toISOString().split('T')[0]}
                                 type="date"
                                 id="checkInDate"
                                 placeholder="Check-In"
@@ -144,6 +224,9 @@ const RoomsTails = () => {
                                 Check-Out
                             </label>
                             <input
+                                onChange={(e) => setCheckOutDate(e.target.value)}
+                                min={checkInDate}
+                                disabled={!checkInDate}
                                 type="date"
                                 id="checkOutDate"
                                 placeholder="Check-Out"
@@ -156,11 +239,11 @@ const RoomsTails = () => {
                             <label htmlFor="guests" className="font-medium">
                                 Guests
                             </label>
-                            <input type="number" id='guests' placeholder='0' className='max-w-20 rounded border border-gray-300 px-3 py-2 mt-1.5 outline-none' required />
+                            <input onChange={(e) => setGuests(e.target.value)} value={guests} type="number" id='guests' placeholder='1' className='max-w-20 rounded border border-gray-300 px-3 py-2 mt-1.5 outline-none' required />
                         </div>
                     </div>
                     <button type='submit' className='bg-primary hover:bg-primary-dull active:scale-95 transition-all text-white rounded-md max-md:w-full max-md:mt-6 md:px-25 py-3 md:py-4 text-base cursor-pointer'>
-                        Check Availability
+                        {isAvailable ? 'book now' : 'Check Availability'}
                     </button>
                 </form>
                 {/* rooms common */}

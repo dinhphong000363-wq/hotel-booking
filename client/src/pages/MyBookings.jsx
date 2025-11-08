@@ -1,9 +1,37 @@
-import React, { useState } from 'react'
-import Title from '../components/Title'
-import { assets, userBookingsDummyData } from '../assets/assets'
+import React, { useEffect, useState } from 'react';
+import Title from '../components/Title';
+import { assets } from '../assets/assets';
+import { useAppContext } from '../conext/AppContext';
+import toast from 'react-hot-toast';
 
 const MyBookings = () => {
-    const [booking, setBooking] = useState(userBookingsDummyData)
+    const { axios, getToken, user } = useAppContext();
+    const [booking, setBookings] = useState([]);
+
+    const fetchUserBookings = async () => {
+        try {
+            const { data } = await axios.get('/api/bookings/user', {
+                headers: {
+                    Authorization: `Bearer ${await getToken()}`,
+                },
+            });
+
+            if (data.success) {
+                setBookings(data.bookings);
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    };
+
+    useEffect(() => {
+        if (user) {
+            fetchUserBookings();
+        }
+    }, [user]);
+
     return (
         <div className="py-28 md:pb-35 md:pt-32 px-4 md:px-16 lg:px-24 xl:px-32">
             <Title
@@ -12,13 +40,13 @@ const MyBookings = () => {
                 align="left"
             />
 
-            <div className='max-w-6xl mt-8 w-full text-gray-800'>
-
-                <div className='hidden md:grid md:grid-cols-[3fr_2fr_1fr] w-full border-b border-gray-300 font-medium text-base py-3'>
+            <div className="max-w-6xl mt-8 w-full text-gray-800">
+                <div className="hidden md:grid md:grid-cols-[3fr_2fr_1fr] w-full border-b border-gray-300 font-medium text-base py-3">
                     <div className="w-1/3">Khách sạn</div>
                     <div className="w-1/3">Ngày & Giờ</div>
                     <div className="w-1/3">Thanh toán</div>
                 </div>
+
                 {booking.map((booking) => (
                     <div
                         key={booking._id}
@@ -27,16 +55,16 @@ const MyBookings = () => {
                         {/* Hotel Details */}
                         <div className="flex flex-col md:flex-row">
                             <img
-                                src={booking.room.images[0]}
+                                src={booking.room?.images?.[0] || assets.noImage}
                                 alt="hotel-img"
                                 className="w-full md:w-44 rounded shadow object-cover"
                             />
 
                             <div className="flex flex-col gap-1.5 mt-3 md:mt-0 md:ml-4">
                                 <p className="font-playfair text-2xl">
-                                    {booking.hotel.name}
+                                    {booking.hotel?.name || 'Unknown Hotel'}
                                     <span className="font-inter text-sm text-gray-600">
-                                        ({booking.room.roomType})
+                                        ({booking.room?.roomType || 'Unknown Type'})
                                     </span>
                                 </p>
 
@@ -46,35 +74,42 @@ const MyBookings = () => {
                                         alt="location-icon"
                                         className="w-4 h-4"
                                     />
-                                    <span>{booking.hotel.address}</span>
+                                    <span>{booking.hotel?.address || 'No address'}</span>
                                 </div>
-                                {/*  */}
+
                                 <div className="flex items-center gap-1 text-sm text-gray-500">
                                     <img
                                         src={assets.guestsIcon}
                                         alt="guests-icon"
                                         className="w-4 h-4"
                                     />
-                                    <span>Guests: {booking.guests}</span>
+                                    <span>Guests: {booking.guests || 0}</span>
                                 </div>
-                                <p className='text-base'>Total: ${booking.totalPrice}</p>
+
+                                <p className="text-base">Total: ${booking.totalPrice || 0}</p>
                             </div>
                         </div>
+
                         {/* date */}
                         <div className="flex flex-row items-start md:items-center gap-8 md:gap-12 mt-3">
                             <div>
                                 <p className="font-medium">Check-In:</p>
                                 <p className="text-gray-500 text-sm">
-                                    {new Date(booking.checkInDate).toDateString()}
+                                    {booking.checkInDate
+                                        ? new Date(booking.checkInDate).toDateString()
+                                        : 'N/A'}
                                 </p>
                             </div>
                             <div>
                                 <p className="font-medium">Check-Out:</p>
                                 <p className="text-gray-500 text-sm">
-                                    {new Date(booking.checkOutDate).toDateString()}
+                                    {booking.checkOutDate
+                                        ? new Date(booking.checkOutDate).toDateString()
+                                        : 'N/A'}
                                 </p>
                             </div>
                         </div>
+
                         {/* payment */}
                         <div className="flex flex-col items-start justify-center pt-3">
                             <div className="flex items-center gap-2">
@@ -96,13 +131,10 @@ const MyBookings = () => {
                             )}
                         </div>
                     </div>
-
                 ))}
-
             </div>
-        </div >
+        </div>
+    );
+};
 
-    )
-}
-
-export default MyBookings
+export default MyBookings;
